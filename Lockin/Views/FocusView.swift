@@ -128,7 +128,7 @@ struct FocusView: View {
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                 if let task = store.task(block.taskID) {
-                    Text("\(Format.duration(task.remainingMinutes)) left on this task - \(Format.deadline(task.deadline, now: now).lowercased())")
+                    Text("\(Format.duration(task.remainingMinutes)) left on this task - \(lowercasedFirst(Format.deadline(task.deadline, now: now)))")
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.7))
                         .multilineTextAlignment(.center)
@@ -171,6 +171,10 @@ struct FocusView: View {
                 }
             }
         }
+    }
+
+    private func lowercasedFirst(_ text: String) -> String {
+        text.prefix(1).lowercased() + text.dropFirst()
     }
 
     private func clock(_ seconds: TimeInterval) -> String {
