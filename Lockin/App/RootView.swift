@@ -6,7 +6,7 @@ struct RootView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
 
-    @State private var tab: Int = 0
+    @State private var tab: Int = min(max(UserDefaults.standard.integer(forKey: "startTab"), 0), 3)
     @State private var showOnboarding: Bool = false
 
     private let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()

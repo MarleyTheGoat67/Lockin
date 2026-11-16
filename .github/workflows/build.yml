@@ -57,3 +57,91 @@ jobs:
         with:
           name: xcodebuild-log
           path: xcodebuild.log
+
+  simulator:
+    name: Run in iPhone simulator
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Lockin.xcodeproj \
+            -scheme Lockin \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build-sim \
+            ONLY_ACTIVE_ARCH=NO \
+            build | tee xcodebuild-sim.log | grep -E "error|BUILD|\*\*" || true
+          test -d build-sim/Build/Products/Release-iphonesimulator/Lockin.app
+          (cd build-sim/Build/Products/Release-iphonesimulator && zip -qry "$GITHUB_WORKSPACE/Lockin-simulator.zip" Lockin.app)
+
+      - name: Upload simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lockin-simulator
+          path: Lockin-simulator.zip
+
+      - name: Launch every screen and take screenshots
+        run: |
+          APP=build-sim/Build/Products/Release-iphonesimulator/Lockin.app
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          phones = [(runtime, d) for runtime, ds in sorted(devices.items()) if "iOS" in runtime for d in ds if d["name"].startswith("iPhone")]
+          exact = [d for _, d in phones if d["name"] == "iPhone 16"]
+          print((exact or [d for _, d in phones])[-1]["udid"])
+          ')
+          echo "Simulator: $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          mkdir shots
+          shot() {
+            name=$1; shift
+            xcrun simctl terminate "$UDID" com.lockin.app 2>/dev/null || true
+            xcrun simctl launch "$UDID" com.lockin.app "$@"
+            sleep 10
+            xcrun simctl io "$UDID" screenshot "shots/$name.png"
+            if xcrun simctl spawn "$UDID" launchctl list | grep -q com.lockin.app; then
+              echo "OK: $name is running"
+            else
+              echo "CRASHED: $name"
+              find ~/Library/Logs/DiagnosticReports -name 'Lockin*' -exec head -c 6000 {} \; || true
+              exit 1
+            fi
+          }
+          shot 1-welcome
+          shot 2-today -demoData YES -startTab 0
+          shot 3-calendar -demoData YES -startTab 1
+          shot 4-tasks -demoData YES -startTab 2
+          shot 5-me -demoData YES -startTab 3
+          shot 6-focus -demoData YES -demoFocus YES
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots
+
+      - name: Publish screenshots to the ci-screenshots branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          cd shots
+          git init -q -b ci-screenshots
+          git add .
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "Simulator screenshots for $GITHUB_SHA"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-screenshots

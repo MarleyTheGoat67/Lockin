@@ -254,6 +254,31 @@ final class Store: ObservableObject {
         commit()
     }
 
+    /// Sample data for simulator demos and screenshots. Only runs with the -demoData launch argument.
+    func seedDemoData(startFocus: Bool) {
+        if tasks.isEmpty {
+            let calendar = Calendar.current
+            let now = Date()
+            func due(_ days: Int, _ hour: Int) -> Date {
+                let day = calendar.date(byAdding: .day, value: days, to: now) ?? now
+                return calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
+            }
+            tasks = [
+                TaskItem(title: "Maths homework p. 42", category: .school, difficulty: .hard, estimatedMinutes: 90, deadline: due(2, 8)),
+                TaskItem(title: "History essay", category: .school, difficulty: .medium, estimatedMinutes: 180, deadline: due(5, 18)),
+                TaskItem(title: "Learn vocabulary", category: .school, difficulty: .easy, estimatedMinutes: 45, deadline: due(1, 20)),
+                TaskItem(title: "Clean my room", category: .chores, difficulty: .easy, estimatedMinutes: 30, deadline: due(3, 19)),
+            ]
+        }
+        isLoading = true
+        settings.onboardingDone = true
+        isLoading = false
+        commit()
+        if startFocus, activeBlock == nil, let first = activeTasks.first {
+            startNow(first.id)
+        }
+    }
+
     // MARK: - Time passing
 
     /// Called every few seconds while the app is open.
