@@ -294,15 +294,18 @@ struct BlockDetailSheet: View {
 
     @State private var newStart: Date = Date()
     @State private var didLoad: Bool = false
+    @State private var editing: TaskItem?
+    @State private var confirmDelete: Bool = false
 
     var body: some View {
         NavigationStack {
             Group {
-                if let block = store.block(blockID) {
+                if let block = store.block(blockID), store.task(block.taskID) != nil {
                     details(block)
                 } else {
-                    Text("This block was re-planned.")
+                    Text("This block moved or was removed.")
                         .foregroundColor(.secondary)
+                        .onAppear { dismiss() }
                 }
             }
             .navigationTitle("Focus block")
@@ -370,6 +373,22 @@ struct BlockDetailSheet: View {
                 }
             }
 
+            if let task = store.task(block.taskID) {
+                Section("Task") {
+                    Button {
+                        editing = task
+                    } label: {
+                        Label("Edit task", systemImage: "pencil")
+                    }
+                    Button(role: .destructive) {
+                        confirmDelete = true
+                    } label: {
+                        Label("Delete task", systemImage: "trash")
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+
             if block.awaitsCheckIn(at: now) {
                 Section("Did you work?") {
                     Button {
@@ -392,6 +411,19 @@ struct BlockDetailSheet: View {
                 newStart = max(block.start, now)
                 didLoad = true
             }
+        }
+        .sheet(item: $editing) { task in
+            TaskEditorView(task: task)
+                .environmentObject(store)
+        }
+        .confirmationDialog("Delete this task?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete task", role: .destructive) {
+                store.deleteTask(block.taskID)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Its planned focus blocks are removed too.")
         }
     }
 }

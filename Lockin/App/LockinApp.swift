@@ -10,10 +10,15 @@ struct LockinApp: App {
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
         NotificationManager.registerCategories()
 
-        // Launch arguments used by the simulator demo: -demoData YES [-demoFocus YES] [-startTab 0...3]
+        // Launch arguments used by the simulator demo and UI tests:
+        // -demoData YES [-demoFocus YES] [-resetData YES] [-demoAllDay YES] [-startTab 0...3]
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: "demoData") {
-            Store.shared.seedDemoData(startFocus: defaults.bool(forKey: "demoFocus"))
+            Store.shared.seedDemoData(
+                startFocus: defaults.bool(forKey: "demoFocus"),
+                reset: defaults.bool(forKey: "resetData"),
+                allDay: defaults.bool(forKey: "demoAllDay")
+            )
         }
     }
 

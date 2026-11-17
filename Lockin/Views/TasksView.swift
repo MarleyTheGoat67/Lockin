@@ -3,6 +3,8 @@ import SwiftUI
 struct TasksView: View {
     @EnvironmentObject private var store: Store
     @State private var showAdd: Bool = false
+    @State private var editing: TaskItem?
+    @State private var deleting: TaskItem?
 
     var body: some View {
         NavigationStack {
@@ -21,7 +23,7 @@ struct TasksView: View {
                 }
 
                 if !store.activeTasks.isEmpty {
-                    Section("To do") {
+                    Section {
                         ForEach(store.activeTasks) { task in
                             NavigationLink {
                                 TaskDetailView(taskID: task.id)
@@ -36,14 +38,24 @@ struct TasksView: View {
                                 }
                                 .tint(.green)
                             }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    store.deleteTask(task.id)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                deleteButton(task)
+                                editButton(task)
+                            }
+                            .contextMenu {
+                                editButton(task)
+                                Button {
+                                    store.setDone(task.id, done: true)
                                 } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    Label("Mark as done", systemImage: "checkmark.circle")
                                 }
+                                deleteButton(task)
                             }
                         }
+                    } header: {
+                        Text("To do")
+                    } footer: {
+                        Text("Tap a task to see it. Swipe left or hold a task to edit or delete it.")
                     }
                 }
 
@@ -55,12 +67,13 @@ struct TasksView: View {
                             } label: {
                                 TaskRow(task: task, atRisk: false)
                             }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    store.deleteTask(task.id)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                deleteButton(task)
+                                editButton(task)
+                            }
+                            .contextMenu {
+                                editButton(task)
+                                deleteButton(task)
                             }
                         }
                     }
@@ -82,6 +95,53 @@ struct TasksView: View {
                 TaskEditorView(task: nil)
                     .environmentObject(store)
             }
+            .sheet(item: $editing) { task in
+                TaskEditorView(task: task)
+                    .environmentObject(store)
+            }
+            .confirmationDialog(
+                "Delete \"\(deleting?.title ?? "")\"?",
+                isPresented: deleteDialogShown,
+                titleVisibility: .visible
+            ) {
+                Button("Delete task", role: .destructive) {
+                    if let task = deleting {
+                        store.deleteTask(task.id)
+                    }
+                    deleting = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    deleting = nil
+                }
+            } message: {
+                Text("Its planned focus blocks are removed too.")
+            }
+        }
+    }
+
+    private var deleteDialogShown: Binding<Bool> {
+        Binding(
+            get: { deleting != nil },
+            set: { shown in
+                if !shown { deleting = nil }
+            }
+        )
+    }
+
+    private func editButton(_ task: TaskItem) -> some View {
+        Button {
+            editing = task
+        } label: {
+            Label("Edit", systemImage: "pencil")
+        }
+        .tint(.orange)
+    }
+
+    private func deleteButton(_ task: TaskItem) -> some View {
+        Button(role: .destructive) {
+            deleting = task
+        } label: {
+            Label("Delete", systemImage: "trash")
         }
     }
 }
@@ -138,6 +198,7 @@ struct TaskEditorView: View {
     @State private var minutes: Int
     @State private var deadline: Date
     @State private var notes: String
+    @State private var confirmDelete: Bool = false
 
     init(task: TaskItem?) {
         existing = task
@@ -174,8 +235,9 @@ struct TaskEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("What do you need to do?") {
+                Section(existing == nil ? "What do you need to do?" : "Name") {
                     TextField("e.g. Maths homework p. 42", text: $title)
+                        .accessibilityIdentifier("taskNameField")
                     Picker("Category", selection: $category) {
                         ForEach(TaskCategory.allCases) { item in
                             Label(item.label, systemImage: item.symbol).tag(item)
@@ -197,7 +259,7 @@ struct TaskEditorView: View {
                 }
 
                 Section {
-                    Stepper(value: $minutes, in: 15...600, step: 15) {
+                    Stepper(value: $minutes, in: 15...1200, step: 15) {
                         HStack {
                             Text("Time needed")
                             Spacer()
@@ -220,13 +282,42 @@ struct TaskEditorView: View {
                     Text(planHint)
                 }
 
-                Section("When is it due?") {
+                Section {
                     DatePicker("Deadline", selection: $deadline, displayedComponents: [.date, .hourAndMinute])
+                        .accessibilityIdentifier("deadlinePicker")
+                    if existing != nil {
+                        HStack(spacing: 8) {
+                            Text("Move by")
+                                .foregroundColor(.secondary)
+                            Spacer(minLength: 0)
+                            shiftButton("+1 day", days: 1)
+                            shiftButton("+1 week", days: 7)
+                        }
+                    }
+                } header: {
+                    Text("When is it due?")
+                } footer: {
+                    if existing != nil {
+                        Text("Changing the deadline re-plans the focus blocks automatically.")
+                    }
                 }
 
                 Section("Notes") {
                     TextField("Optional", text: $notes, axis: .vertical)
                         .lineLimit(2...5)
+                }
+
+                if existing != nil {
+                    Section {
+                        Button(role: .destructive) {
+                            confirmDelete = true
+                        } label: {
+                            Label("Delete task", systemImage: "trash")
+                                .foregroundColor(.red)
+                        }
+                    } footer: {
+                        Text("Deletes the task and its planned focus blocks.")
+                    }
                 }
             }
             .navigationTitle(existing == nil ? "New task" : "Edit task")
@@ -240,7 +331,25 @@ struct TaskEditorView: View {
                         .disabled(trimmedTitle.isEmpty)
                 }
             }
+            .confirmationDialog("Delete this task?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("Delete task", role: .destructive) {
+                    if let task = existing {
+                        store.deleteTask(task.id)
+                    }
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Its planned focus blocks are removed too.")
+            }
         }
+    }
+
+    private func shiftButton(_ title: String, days: Int) -> some View {
+        Button(title) {
+            deadline = Calendar.current.date(byAdding: .day, value: days, to: deadline) ?? deadline
+        }
+        .buttonStyle(.bordered)
     }
 
     private var difficultyHint: String {
@@ -290,6 +399,7 @@ struct TaskDetailView: View {
             } else {
                 Text("This task was deleted.")
                     .foregroundColor(.secondary)
+                    .onAppear { dismiss() }
             }
         }
         .navigationTitle("Task")
@@ -335,6 +445,22 @@ struct TaskDetailView: View {
                 }
             }
 
+            Section {
+                Button {
+                    showEdit = true
+                } label: {
+                    Label("Edit task", systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    confirmDelete = true
+                } label: {
+                    Label("Delete task", systemImage: "trash")
+                        .foregroundColor(.red)
+                }
+            } footer: {
+                Text("Change the name, deadline, difficulty or time needed.")
+            }
+
             if !task.isDone {
                 Section {
                     Button {
@@ -374,13 +500,6 @@ struct TaskDetailView: View {
                 }
             }
 
-            Section {
-                Button(role: .destructive) {
-                    confirmDelete = true
-                } label: {
-                    Label("Delete task", systemImage: "trash")
-                }
-            }
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -391,12 +510,13 @@ struct TaskDetailView: View {
             TaskEditorView(task: task)
                 .environmentObject(store)
         }
-        .confirmationDialog("Delete this task and its planned blocks?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
+        .confirmationDialog("Delete this task?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete task", role: .destructive) {
                 store.deleteTask(task.id)
-                dismiss()
             }
             Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Its planned focus blocks are removed too.")
         }
     }
 

@@ -16,6 +16,7 @@ An iPhone app that plans your work for you and keeps you off social media while 
 - **Deadline warnings** - if a task cannot be finished in time with your free hours, it is flagged *At risk*.
 - **Missed a block? It is planned again automatically.** After each block you check in with one tap (also from the notification).
 - **Move, skip or start early** - tap any block in the calendar. Moved blocks are pinned.
+- **Edit or delete any task** - tap it and choose *Edit task* or *Delete task*, swipe left on it, or hold it. Tapping a block in the calendar or on Today works too. Change the name, deadline (with quick *+1 day* / *+1 week*), difficulty or time; the plan updates by itself.
 - **Strict mode** - ending a session early needs an 8 second hold.
 - **Streak and stats** - focus time, sessions and how many distractions were blocked.
 - **Morning summary** notification with the day's plan.
@@ -55,6 +56,7 @@ Lockin/App        app entry point and the data store
 Lockin/Services   notifications and the Shortcuts actions
 Lockin/Views      SwiftUI screens
 Tests             unit tests for the scheduler
+UITests           simulator tests that tap through editing and deleting tasks (run on GitHub)
 ```
 
 The planning logic is tested on its own:

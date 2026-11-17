@@ -81,6 +81,7 @@ final class Store: ObservableObject {
     func blocks(on day: Date, calendar: Calendar = .current) -> [FocusBlock] {
         blocks
             .filter { $0.status == .planned || $0.status == .completed }
+            .filter { task($0.taskID) != nil }
             .filter { calendar.isDate($0.start, inSameDayAs: day) }
             .sorted { $0.start < $1.start }
     }
@@ -254,8 +255,19 @@ final class Store: ObservableObject {
         commit()
     }
 
-    /// Sample data for simulator demos and screenshots. Only runs with the -demoData launch argument.
-    func seedDemoData(startFocus: Bool) {
+    /// Sample data for simulator demos, screenshots and UI tests. Only runs with the -demoData launch argument.
+    /// `allDay` makes every hour free, so the plan always starts today whatever the time is.
+    func seedDemoData(startFocus: Bool, reset: Bool = false, allDay: Bool = false) {
+        if reset {
+            tasks = []
+            blocks = []
+            settings = PlannerSettings()
+        }
+        if allDay {
+            isLoading = true
+            settings.windows = Array(repeating: DayWindow(enabled: true, startMinute: 0, endMinute: 24 * 60), count: 7)
+            isLoading = false
+        }
         if tasks.isEmpty {
             let calendar = Calendar.current
             let now = Date()

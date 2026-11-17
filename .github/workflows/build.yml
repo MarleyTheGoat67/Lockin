@@ -104,6 +104,7 @@ jobs:
           print((exact or [d for _, d in phones])[-1]["udid"])
           ')
           echo "Simulator: $UDID"
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
@@ -129,6 +130,21 @@ jobs:
           shot 5-me -demoData YES -startTab 3
           shot 6-focus -demoData YES -demoFocus YES
 
+      - name: UI tests - edit and delete tasks
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Lockin.xcodeproj \
+            -scheme Lockin \
+            -destination "id=$UDID" \
+            -derivedDataPath build-test \
+            -resultBundlePath UITestResults.xcresult \
+            > xcodebuild-test.log 2>&1 || status=$?
+          grep -E "Test Case|error:|XCTAssert|\*\* TEST|Executed" xcodebuild-test.log || true
+          awk '/=== HIERARCHY START/,/=== HIERARCHY END/' xcodebuild-test.log | head -400
+          cp "$HOME"/lockin-uitest-shots/*.png shots/ 2>/dev/null || true
+          if [ -n "$status" ]; then tail -60 xcodebuild-test.log; exit "$status"; fi
+
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -137,6 +153,7 @@ jobs:
           path: shots
 
       - name: Publish screenshots to the ci-screenshots branch
+        if: always()
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |

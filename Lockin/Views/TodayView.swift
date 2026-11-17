@@ -408,6 +408,7 @@ private struct WeekBar: View {
 private struct TodayScheduleCard: View {
     @EnvironmentObject private var store: Store
     let now: Date
+    @State private var selectedBlock: FocusBlock?
 
     var body: some View {
         let blocks = store.blocks(on: now)
@@ -420,10 +421,19 @@ private struct TodayScheduleCard: View {
             } else {
                 ForEach(blocks) { block in
                     BlockRow(block: block, now: now)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedBlock = block
+                        }
                 }
             }
         }
         .card()
+        .sheet(item: $selectedBlock) { block in
+            BlockDetailSheet(blockID: block.id)
+                .environmentObject(store)
+                .presentationDetents([.medium, .large])
+        }
     }
 }
 
