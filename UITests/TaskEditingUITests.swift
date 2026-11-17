@@ -94,8 +94,10 @@ final class TaskEditingUITests: XCTestCase {
     func testEditAndDeleteFromCalendar() {
         launch(tab: 1)
         tap(anything(containing: "Maths homework"))
+        wait(button("Delete task"))
+        let edit = wait(button("Edit task"))
         screenshot("calendar-1-block")
-        tap(button("Edit task"))
+        edit.tap()
         let field = wait(app.textFields["taskNameField"])
         replaceText(in: field, with: "Maths test")
         tap(app.buttons["Save"])

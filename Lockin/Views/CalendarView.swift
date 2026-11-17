@@ -346,6 +346,22 @@ struct BlockDetailSheet: View {
                 }
             }
 
+            if let task = store.task(block.taskID) {
+                Section("Task") {
+                    Button {
+                        editing = task
+                    } label: {
+                        Label("Edit task", systemImage: "pencil")
+                    }
+                    Button(role: .destructive) {
+                        confirmDelete = true
+                    } label: {
+                        Label("Delete task", systemImage: "trash")
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+
             if isFuture {
                 Section {
                     Button {
@@ -369,22 +385,6 @@ struct BlockDetailSheet: View {
                         dismiss()
                     } label: {
                         Label("Move and pin here", systemImage: "pin.fill")
-                    }
-                }
-            }
-
-            if let task = store.task(block.taskID) {
-                Section("Task") {
-                    Button {
-                        editing = task
-                    } label: {
-                        Label("Edit task", systemImage: "pencil")
-                    }
-                    Button(role: .destructive) {
-                        confirmDelete = true
-                    } label: {
-                        Label("Delete task", systemImage: "trash")
-                            .foregroundColor(.red)
                     }
                 }
             }
